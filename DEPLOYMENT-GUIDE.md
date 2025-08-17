@@ -6,7 +6,7 @@
 
 1. **Va sur ton tableau de bord Supabase :**
    - Connecte-toi sur [supabase.com](https://supabase.com)
-   - Sélectionne ton projet `vhljhfumyihymivvlyzb`
+   - Sélectionne ton projet `merjfjpiqppjhdasvyvk`
 
 2. **Configurer le secret pour l'API Anthropic :**
    - Dans le menu de gauche, clique sur **"Edge Functions"**
@@ -32,7 +32,7 @@ supabase login
 
 ```bash
 # Lier ton projet local au projet Supabase
-supabase link --project-ref vhljhfumyihymivvlyzb
+supabase link --project-ref merjfjpiqppjhdasvyvk
 
 # Déployer les Edge Functions
 supabase functions deploy analyze-profiles
@@ -62,14 +62,14 @@ supabase functions deploy upload-profiles
 Une fois déployé, teste les URLs suivantes :
 
 **Edge Functions déployées :**
-- `https://vhljhfumyihymivvlyzb.supabase.co/functions/v1/analyze-profiles`
-- `https://vhljhfumyihymivvlyzb.supabase.co/functions/v1/upload-profiles`
+- `https://merjfjpiqppjhdasvyvk.supabase.co/functions/v1/analyze-profiles`
+- `https://merjfjpiqppjhdasvyvk.supabase.co/functions/v1/upload-profiles`
 
 **Test avec curl :**
 ```bash
 # Test de l'analyse
-curl -X POST 'https://vhljhfumyihymivvlyzb.supabase.co/functions/v1/analyze-profiles' \
--H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZobGpoZnVteWloeW1pdnZseXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0MjQzMTAsImV4cCI6MjA3MTAwMDMxMH0.TJkRs5sRYWcpfbkOAiytuoKPKQFL8vYf1FEyvC5alH0' \
+curl -X POST 'https://merjfjpiqppjhdasvyvk.supabase.co/functions/v1/analyze-profiles' \
+-H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcmpmanBpcXBwamhkYXN2eXZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0MzM2MDAsImV4cCI6MjA3MTAwOTYwMH0.MKSK5ySVqYj8yLSpJM4t-2mpFica8nj-dGdH8PwrqcM' \
 -H 'Content-Type: application/json' \
 -d '{"jobDescription":"Nous recherchons un développeur full-stack React/Node.js"}'
 ```
