@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Upload, Search, Star, TrendingUp, User, BookOpen, Heart, Building } from 'lucide-react';
+import { extractTextFromPDF, type ProfileData } from '@/utils/pdfExtractor';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,8 +52,8 @@ const ProfileAnalyzer = () => {
     setUploadedFiles(prev => [...prev, ...files]);
   };
 
-  const uploadProfiles = async () => {
-    if (uploadedFiles.length === 0) return;
+  const uploadProfilesToStorage = async () => {
+    if (uploadedFiles.length === 0) return true;
 
     const formData = new FormData();
     uploadedFiles.forEach(file => {
@@ -60,7 +61,9 @@ const ProfileAnalyzer = () => {
     });
 
     try {
-      const response = await fetch('https://merjfjpiqppjhdasvyvk.supabase.co/functions/v1/upload-profiles', {
+      console.log(`Uploading ${uploadedFiles.length} files to Supabase Storage...`);
+      
+      const response = await fetch('https://merjfjpiqppjhdasvyvk.supabase.co/functions/v1/upload-to-storage', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcmpmanBpcXBwamhkYXN2eXZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0MzM2MDAsImV4cCI6MjA3MTAwOTYwMH0.MKSK5ySVqYj8yLSpJM4t-2mpFica8nj-dGdH8PwrqcM`,
@@ -69,14 +72,18 @@ const ProfileAnalyzer = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Upload failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Upload failed');
       }
 
+      const result = await response.json();
+      console.log(`Successfully uploaded ${result.total_uploaded} files:`, result.files);
+      
       setUploadedFiles([]);
       return true;
     } catch (err) {
       console.error('Upload error:', err);
-      setError('Erreur lors de l\'upload des profils');
+      setError(`Erreur lors de l'upload: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
       return false;
     }
   };
@@ -91,16 +98,19 @@ const ProfileAnalyzer = () => {
     setError(null);
 
     try {
-      // Upload files first if any
+      // Upload files to Supabase Storage if any
       if (uploadedFiles.length > 0) {
-        const uploadSuccess = await uploadProfiles();
+        console.log(`Uploading ${uploadedFiles.length} files to storage before analysis...`);
+        const uploadSuccess = await uploadProfilesToStorage();
         if (!uploadSuccess) {
           setLoading(false);
           return;
         }
       }
 
-      // Start analysis
+      // Start analysis - Edge Function will get profiles from Supabase Storage
+      console.log('Starting analysis with profiles from Supabase Storage...');
+      
       const response = await fetch('https://merjfjpiqppjhdasvyvk.supabase.co/functions/v1/analyze-profiles', {
         method: 'POST',
         headers: {
@@ -116,6 +126,14 @@ const ProfileAnalyzer = () => {
       }
 
       const result = await response.json();
+      console.log('Analysis result:', result);
+      
+      // Show debug info to user
+      if (result.debug_info) {
+        console.log('Debug info:', result.debug_info);
+        console.log(`Source: ${result.debug_info.source}, Profiles analyzed: ${result.debug_info.profiles_used}`);
+      }
+      
       setAnalysisResult(result);
     } catch (err) {
       console.error('Analysis error:', err);

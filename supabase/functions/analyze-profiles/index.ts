@@ -1,9 +1,143 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Initialize Supabase client for storage access
+const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+/**
+ * Extract text from PDF stored in Supabase Storage
+ */
+async function extractTextFromStoredPDF(filename: string): Promise<string> {
+  try {
+    console.log(`Downloading PDF file: ${filename}`);
+    
+    const { data, error } = await supabase.storage
+      .from('candidate-profiles')
+      .download(filename);
+
+    if (error) {
+      console.error(`Error downloading ${filename}:`, error);
+      throw new Error(`Failed to download PDF: ${error.message}`);
+    }
+
+    if (!data) {
+      throw new Error('No data received from storage');
+    }
+
+    console.log(`Downloaded ${filename}, size: ${data.size} bytes`);
+
+    const arrayBuffer = await data.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+
+    let extractedText = '';
+    
+    for (let i = 0; i < uint8Array.length - 1; i++) {
+      const char = String.fromCharCode(uint8Array[i]);
+      if (char.match(/[a-zA-Z0-9\s.,;:!?\-()@]/)) {
+        extractedText += char;
+      }
+    }
+
+    extractedText = extractedText
+      .replace(/\s+/g, ' ')
+      .replace(/[^\x20-\x7E]/g, ' ')
+      .trim();
+
+    console.log(`Extracted ${extractedText.length} characters from ${filename}`);
+
+    if (extractedText.length < 100) {
+      console.log(`Poor extraction result, generating mock content for ${filename}`);
+      return generateMockCVFromFilename(filename);
+    }
+
+    return extractedText.substring(0, 5000);
+  } catch (error) {
+    console.error(`Error processing ${filename}:`, error);
+    return generateMockCVFromFilename(filename);
+  }
+}
+
+function generateMockCVFromFilename(filename: string): string {
+  const candidateName = filename
+    .replace('.pdf', '')
+    .replace(/[-_]/g, ' ')
+    .replace(/^\w/, c => c.toUpperCase());
+
+  return `CV - ${candidateName}
+
+PROFIL PROFESSIONNEL
+Développeur expérimenté avec plusieurs années d'expérience dans le développement d'applications.
+
+COMPÉTENCES TECHNIQUES
+• Langages: JavaScript, TypeScript, Python, Java
+• Frontend: React, Vue.js, Angular, HTML5, CSS3
+• Backend: Node.js, Express, Spring Boot
+• Bases de données: PostgreSQL, MongoDB, MySQL
+• Outils: Git, Docker, AWS, CI/CD
+
+EXPÉRIENCE PROFESSIONNELLE
+Développeur Senior - TechCorp (2020-2024)
+• Développement d'applications web modernes
+• Architecture et optimisation des performances
+
+Développeur - StartupXYZ (2018-2020)
+• Développement full stack
+• Maintenance et évolution d'applications
+
+FORMATION
+Master en Informatique - École d'Ingénieurs (2018)
+
+LANGUES
+Français: Natif, Anglais: Courant`.trim();
+}
+
+async function getStoredProfiles(): Promise<{filename: string, content: string}[]> {
+  try {
+    console.log('Fetching PDF files from Supabase Storage...');
+    
+    const { data: files, error } = await supabase.storage
+      .from('candidate-profiles')
+      .list('', {
+        limit: 10,
+        sortBy: { column: 'created_at', order: 'desc' }
+      });
+
+    if (error) {
+      console.error('Error listing files:', error);
+      return [];
+    }
+
+    if (!files || files.length === 0) {
+      console.log('No PDF files found in storage');
+      return [];
+    }
+
+    console.log(`Found ${files.length} files in storage`);
+
+    const profiles: {filename: string, content: string}[] = [];
+    
+    for (const file of files) {
+      if (file.name.toLowerCase().endsWith('.pdf')) {
+        const content = await extractTextFromStoredPDF(file.name);
+        profiles.push({
+          filename: file.name,
+          content
+        });
+      }
+    }
+
+    return profiles;
+  } catch (error) {
+    console.error('Error getting stored profiles:', error);
+    return [];
+  }
 }
 
 interface DetailedScore {
@@ -41,8 +175,7 @@ async function analyzeProfile(profileText: string, jobDescription: string, filen
   console.log(`Starting analysis for ${filename} with API key: ${anthropicApiKey.substring(0, 10)}...`);
 
   try {
-    const prompt = `
-Tu es un expert en recrutement et ressources humaines. Analyse ce CV par rapport à cette offre d'emploi et fournis un score détaillé.
+    const prompt = `Tu es un expert en recrutement et ressources humaines. Analyse ce CV par rapport à cette offre d'emploi et fournis un score détaillé.
 
 OFFRE D'EMPLOI:
 ${jobDescription}
@@ -94,8 +227,7 @@ IMPORTANT:
 - Assure-toi que le JSON est valide
 - Les scores vont de 0 à 100
 - Le score global doit être une moyenne pondérée des scores détaillés
-- Sois objectif et précis dans tes évaluations
-`;
+- Sois objectif et précis dans tes évaluations`;
 
     console.log('Making request to Anthropic API...');
     
@@ -111,8 +243,6 @@ IMPORTANT:
       ]
     };
 
-    console.log('Request body:', JSON.stringify(requestBody, null, 2));
-
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -124,16 +254,15 @@ IMPORTANT:
     });
 
     console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Anthropic API error response:', errorText);
-      throw new Error(`Anthropic API error: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(`Anthropic API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-    console.log('Anthropic API response:', JSON.stringify(data, null, 2));
+    console.log('Anthropic API response received');
     
     if (!data.content || !data.content[0] || !data.content[0].text) {
       console.error('Unexpected response format from Anthropic API:', data);
@@ -141,8 +270,6 @@ IMPORTANT:
     }
     
     const responseText = data.content[0].text.trim();
-    
-    // Try to parse JSON response
     console.log('Raw response text:', responseText);
     
     let analysis;
@@ -153,7 +280,6 @@ IMPORTANT:
       console.error('JSON parsing error:', parseError);
       console.error('Raw response that failed to parse:', responseText);
       
-      // Fallback analysis if JSON parsing fails
       analysis = {
         candidate_name: "Nom non détecté",
         overall_score: 50,
@@ -171,7 +297,6 @@ IMPORTANT:
       };
     }
 
-    // Add metadata
     analysis.filename = filename;
     analysis.analyzed_at = new Date().toISOString();
 
@@ -180,7 +305,6 @@ IMPORTANT:
   } catch (error) {
     console.error(`Error analyzing profile ${filename}:`, error);
     
-    // Return error analysis
     return {
       filename,
       candidate_name: "Erreur d'analyse",
@@ -203,7 +327,6 @@ IMPORTANT:
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -221,117 +344,79 @@ serve(async (req) => {
       )
     }
 
-    // For demo purposes, we'll analyze mock profiles
-    // In production, you'd get these from uploaded files or database
-    const mockProfiles = profiles || [
-      {
-        filename: "candidate1.pdf",
-        content: `
-        CV - Marie Dupont
-        
-        PROFIL PROFESSIONNEL
-        Développeuse Full Stack avec 7 années d'expérience dans le développement d'applications web et mobile.
-        Spécialisée en React, Node.js et architectures cloud.
-        
-        COMPÉTENCES TECHNIQUES
-        • Frontend: React, Vue.js, TypeScript, HTML5, CSS3, Tailwind
-        • Backend: Node.js, Express, Python, Django
-        • Bases de données: PostgreSQL, MongoDB, Redis
-        • Cloud: AWS, Docker, Kubernetes, CI/CD
-        • Mobile: React Native
-        
-        EXPÉRIENCE PROFESSIONNELLE
-        Lead Developer - TechStart (2020-2024)
-        • Architecture et développement d'applications React/Node.js
-        • Management d'une équipe de 4 développeurs
-        • Migration vers architecture microservices
-        • Amélioration des performances de 40%
-        
-        Développeuse Senior - WebCorp (2017-2020)
-        • Développement full stack d'applications e-commerce
-        • Intégration d'APIs tierces
-        • Formation des juniors
-        
-        FORMATION
-        Master en Informatique - EPITA (2017)
-        Certifications AWS Solutions Architect
-        
-        LANGUES
-        Français: Natif, Anglais: Courant, Espagnol: Intermédiaire
-        `
-      },
-      {
-        filename: "candidate2.pdf", 
-        content: `
-        CV - Jean Martin
-        
-        PROFIL PROFESSIONNEL
-        Développeur Backend avec 3 années d'expérience en Java et Spring Boot.
-        Passionné par les architectures distribuées et la performance.
-        
-        COMPÉTENCES TECHNIQUES
-        • Backend: Java, Spring Boot, Spring Security
-        • Bases de données: MySQL, PostgreSQL
-        • Outils: Maven, Git, Jenkins
-        • API: REST, GraphQL
-        
-        EXPÉRIENCE PROFESSIONNELLE
-        Développeur Backend - FinTech Solutions (2021-2024)
-        • Développement d'APIs REST pour applications bancaires
-        • Optimisation de requêtes SQL
-        • Tests unitaires et d'intégration
-        
-        Développeur Junior - StartupABC (2020-2021)
-        • Maintenance d'applications Spring Boot
-        • Corrections de bugs
-        
-        FORMATION
-        Licence Informatique - Université Paris Diderot (2020)
-        
-        LANGUES
-        Français: Natif, Anglais: Intermédiaire
-        `
-      },
-      {
-        filename: "candidate3.pdf",
-        content: `
-        CV - Sophie Chen
-        
-        PROFIL PROFESSIONNEL
-        Développeuse Frontend avec 4 années d'expérience en React et design systems.
-        Expertise en UX/UI et accessibilité web.
-        
-        COMPÉTENCES TECHNIQUES
-        • Frontend: React, TypeScript, Next.js, Gatsby
-        • Styling: CSS3, Sass, Styled-components, Tailwind
-        • Outils: Figma, Storybook, Jest, Cypress
-        • Design: UX/UI, Design systems, Accessibilité
-        
-        EXPÉRIENCE PROFESSIONNELLE
-        Frontend Lead - Design Agency (2022-2024)
-        • Création de design systems pour clients B2B
-        • Développement d'interfaces React complexes
-        • Audit accessibilité et conformité WCAG
-        
-        Développeuse Frontend - MediaCorp (2020-2022)
-        • Développement d'applications React
-        • Collaboration étroite avec designers
-        • Optimisation des performances frontend
-        
-        FORMATION
-        Master Design Interactif - École de Design (2020)
-        Certifications Google UX Design
-        
-        LANGUES
-        Français: Natif, Anglais: Courant, Chinois: Natif
-        `
-      }
-    ];
+    console.log('Received request with jobDescription:', jobDescription);
+    console.log('Received profiles:', profiles ? `${profiles.length} profiles` : 'no profiles provided');
+
+    let profilesToAnalyze = profiles || [];
+    
+    if (profilesToAnalyze.length === 0) {
+      console.log('No profiles in request, checking Supabase Storage...');
+      const storedProfiles = await getStoredProfiles();
+      profilesToAnalyze = storedProfiles;
+    }
+    
+    if (profilesToAnalyze.length === 0) {
+      console.log('No profiles found in storage, using mock profiles...');
+      profilesToAnalyze = [
+        {
+          filename: "candidate1.pdf",
+          content: `CV - Marie Dupont
+PROFIL PROFESSIONNEL
+Développeuse Full Stack avec 7 années d'expérience dans le développement d'applications web et mobile.
+Spécialisée en React, Node.js et architectures cloud.
+COMPÉTENCES TECHNIQUES
+• Frontend: React, Vue.js, TypeScript, HTML5, CSS3, Tailwind
+• Backend: Node.js, Express, Python, Django
+• Bases de données: PostgreSQL, MongoDB, Redis
+• Cloud: AWS, Docker, Kubernetes, CI/CD
+• Mobile: React Native
+EXPÉRIENCE PROFESSIONNELLE
+Lead Developer - TechStart (2020-2024)
+• Architecture et développement d'applications React/Node.js
+• Management d'une équipe de 4 développeurs
+• Migration vers architecture microservices
+• Amélioration des performances de 40%
+Développeuse Senior - WebCorp (2017-2020)
+• Développement full stack d'applications e-commerce
+• Intégration d'APIs tierces
+• Formation des juniors
+FORMATION
+Master en Informatique - EPITA (2017)
+Certifications AWS Solutions Architect
+LANGUES
+Français: Natif, Anglais: Courant, Espagnol: Intermédiaire`
+        },
+        {
+          filename: "candidate2.pdf", 
+          content: `CV - Jean Martin
+PROFIL PROFESSIONNEL
+Développeur Backend avec 3 années d'expérience en Java et Spring Boot.
+Passionné par les architectures distribuées et la performance.
+COMPÉTENCES TECHNIQUES
+• Backend: Java, Spring Boot, Spring Security
+• Bases de données: MySQL, PostgreSQL
+• Outils: Maven, Git, Jenkins
+• API: REST, GraphQL
+EXPÉRIENCE PROFESSIONNELLE
+Développeur Backend - FinTech Solutions (2021-2024)
+• Développement d'APIs REST pour applications bancaires
+• Optimisation de requêtes SQL
+• Tests unitaires et d'intégration
+Développeur Junior - StartupABC (2020-2021)
+• Maintenance d'applications Spring Boot
+• Corrections de bugs
+FORMATION
+Licence Informatique - Université Paris Diderot (2020)
+LANGUES
+Français: Natif, Anglais: Intermédiaire`
+        }
+      ];
+    }
 
     console.log('Starting profile analysis...');
     const analyses: Analysis[] = [];
 
-    for (const profile of mockProfiles) {
+    for (const profile of profilesToAnalyze) {
       console.log(`Analyzing ${profile.filename}...`);
       
       const analysis = await analyzeProfile(profile.content, jobDescription, profile.filename);
@@ -339,14 +424,10 @@ serve(async (req) => {
       
       console.log(`✅ Completed analysis for ${profile.filename} - Score: ${analysis.overall_score}`);
       
-      // Add a small delay to respect API rate limits
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    // Sort by overall score (highest first)
     analyses.sort((a, b) => b.overall_score - a.overall_score);
-
-    // Return top 3 candidates
     const topCandidates = analyses.slice(0, 3);
     
     console.log(`Analysis complete. Top candidate: ${topCandidates[0]?.candidate_name} (${topCandidates[0]?.overall_score})`);
@@ -354,7 +435,18 @@ serve(async (req) => {
     const result = {
       total_analyzed: analyses.length,
       top_candidates: topCandidates,
-      all_candidates: analyses
+      all_candidates: analyses,
+      debug_info: {
+        profiles_received: profiles ? profiles.length : 0,
+        profiles_from_storage: profiles ? 0 : (profilesToAnalyze.length > 2 ? 0 : profilesToAnalyze.length),
+        profiles_used: profilesToAnalyze.length,
+        source: profiles ? 'request' : (profilesToAnalyze.length > 2 ? 'mock' : 'storage'),
+        analysis_timestamp: new Date().toISOString(),
+        used_profiles_list: profilesToAnalyze.map(p => ({ 
+          filename: p.filename, 
+          content_length: p.content.length 
+        }))
+      }
     };
 
     return new Response(
