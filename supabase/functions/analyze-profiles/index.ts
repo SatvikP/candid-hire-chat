@@ -34,8 +34,11 @@ async function analyzeProfile(profileText: string, jobDescription: string, filen
   const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
   
   if (!anthropicApiKey) {
+    console.error('ANTHROPIC_API_KEY not configured');
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
+
+  console.log(`Starting analysis for ${filename} with API key: ${anthropicApiKey.substring(0, 10)}...`);
 
   try {
     const prompt = `
@@ -94,6 +97,22 @@ IMPORTANT:
 - Sois objectif et précis dans tes évaluations
 `;
 
+    console.log('Making request to Anthropic API...');
+    
+    const requestBody = {
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 2000,
+      temperature: 0.1,
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ]
+    };
+
+    console.log('Request body:', JSON.stringify(requestBody, null, 2));
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -101,33 +120,38 @@ IMPORTANT:
         'x-api-key': anthropicApiKey,
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 2000,
-        temperature: 0.1,
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ]
-      })
+      body: JSON.stringify(requestBody)
     });
 
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
-      throw new Error(`Anthropic API error: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Anthropic API error response:', errorText);
+      throw new Error(`Anthropic API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json();
+    console.log('Anthropic API response:', JSON.stringify(data, null, 2));
+    
+    if (!data.content || !data.content[0] || !data.content[0].text) {
+      console.error('Unexpected response format from Anthropic API:', data);
+      throw new Error('Unexpected response format from Anthropic API');
+    }
+    
     const responseText = data.content[0].text.trim();
     
     // Try to parse JSON response
+    console.log('Raw response text:', responseText);
+    
     let analysis;
     try {
       analysis = JSON.parse(responseText);
+      console.log('Successfully parsed JSON:', analysis);
     } catch (parseError) {
       console.error('JSON parsing error:', parseError);
-      console.error('Raw response:', responseText);
+      console.error('Raw response that failed to parse:', responseText);
       
       // Fallback analysis if JSON parsing fails
       analysis = {
