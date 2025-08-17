@@ -1,4 +1,5 @@
 import ChatBox from './ChatBox';
+import ProfileAnalyzer from './ProfileAnalyzer';
 
 const Hero = () => {
   return (
@@ -46,10 +47,10 @@ const Hero = () => {
         {/* Spacer to push chat to bottom */}
         <div className="flex-1"></div>
 
-        {/* Chat Interface - Bottom */}
+        {/* Profile Analyzer Interface - Bottom */}
         <div className="pb-8 px-8 lg:pb-12 lg:px-12">
-          <div className="w-full max-w-xl mx-auto animate-slide-up">
-            <ChatBox />
+          <div className="w-full max-w-4xl mx-auto animate-slide-up">
+            <ProfileAnalyzer />
           </div>
         </div>
       </div>

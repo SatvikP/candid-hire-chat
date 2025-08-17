@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Environment variables
+.env
+
+# Uploaded profiles (security)
+profiles/
+*.pdf
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
