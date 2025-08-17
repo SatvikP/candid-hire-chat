@@ -7,8 +7,8 @@ const corsHeaders = {
 }
 
 // Initialize Supabase client
-const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const supabaseUrl = Deno.env.get('SUPABASE_PROJECT_URL') ?? 'https://merjfjpiqppjhdasvyvk.supabase.co'
+const supabaseServiceKey = Deno.env.get('SERVICE_ROLE_KEY') ?? ''
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 serve(async (req) => {
@@ -19,6 +19,10 @@ serve(async (req) => {
 
   try {
     console.log('Upload request received');
+    console.log('Supabase URL:', supabaseUrl);
+    console.log('Service key configured:', supabaseServiceKey ? 'Yes' : 'No');
+    console.log('Request method:', req.method);
+    console.log('Content-Type:', req.headers.get('content-type'));
     
     // Get the request body as form data
     const formData = await req.formData()
@@ -59,7 +63,7 @@ serve(async (req) => {
         
         // Upload to Supabase Storage
         const { data, error } = await supabase.storage
-          .from('candidate-profiles')
+          .from('candidate_profiles')
           .upload(uniqueFilename, arrayBuffer, {
             contentType: 'application/pdf',
             duplex: 'half'
