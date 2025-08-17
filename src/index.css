@@ -137,7 +137,7 @@
   }
   
   .glass-input {
-    background: hsl(var(--input));
+    background: hsl(var(--input) / 0.2);
     backdrop-filter: blur(10px);
     border: 1px solid hsl(var(--glass-border));
     transition: var(--transition-smooth);
