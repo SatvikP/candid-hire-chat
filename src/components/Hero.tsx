@@ -1,0 +1,53 @@
+import ChatBox from './ChatBox';
+
+const Hero = () => {
+  return (
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Video Background */}
+      <video
+        className="absolute inset-0 w-full h-full object-cover z-0"
+        autoPlay
+        muted
+        loop
+        playsInline
+      >
+        <source
+          src="https://cdn.midjourney.com/video/10e1da42-5a62-4d17-be4b-5514055728a5/1.mp4"
+          type="video/mp4"
+        />
+      </video>
+
+      {/* Dark Overlay */}
+      <div className="absolute inset-0 video-overlay z-10" />
+
+      {/* Navigation */}
+      <nav className="relative z-30 flex justify-between items-center p-8 lg:p-12">
+        <div className="text-white font-light tracking-wide text-xl">
+          CandidChat
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <div className="relative z-20 flex-1 flex flex-col items-center justify-center min-h-screen pt-24 pb-8 px-8 lg:pb-12 lg:px-12">
+        {/* Hero Text */}
+        <div className="text-center mb-12 animate-fade-in">
+          <p className="text-white/60 text-sm font-light tracking-wide mb-6">
+            Chat with your future talent.
+          </p>
+          <div className="max-w-lg mx-auto">
+            <p className="text-white/70 font-light leading-relaxed">
+              Skip the basic conversation, and deep dive already on key challenges and hire the best.
+            </p>
+          </div>
+        </div>
+
+        {/* Chat Interface */}
+        <div className="w-full max-w-2xl animate-slide-up">
+          <ChatBox />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Hero;
