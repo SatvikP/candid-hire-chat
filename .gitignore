@@ -16,7 +16,6 @@ dist-ssr
 .env
 
 # Uploaded profiles (security)
-profiles/
 *.pdf
 
 # Editor directories and files
