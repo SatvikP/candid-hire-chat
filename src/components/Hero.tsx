@@ -31,12 +31,12 @@ const Hero = () => {
       <div className="relative z-20 flex flex-col min-h-screen">
         {/* Hero Text - Top Area */}
         <div className="pt-8 pb-4 px-8 lg:px-12">
-          <div className="text-center animate-fade-in">
-            <p className="text-white/80 text-lg font-bold tracking-wide mb-4">
+          <div className="text-left animate-fade-in">
+            <p className="text-white/80 text-4xl lg:text-5xl font-bold tracking-wide mb-6">
               Chat with your future talent.
             </p>
-            <div className="max-w-2xl mx-auto">
-              <p className="text-white/90 font-bold text-xl leading-relaxed">
+            <div className="max-w-4xl">
+              <p className="text-white/90 font-bold text-3xl lg:text-4xl leading-relaxed">
                 Skip the basic conversation, and deep dive already on key challenges and hire the best.
               </p>
             </div>
